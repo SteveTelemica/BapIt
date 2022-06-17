@@ -551,14 +551,12 @@ void loop() {
     Serial.printf("Press s or BapIt to Start.\r\n");
     setLED( -1);
     state = 0;
-    // Wait one second, not elegant but simple and direct, only do it in this mode
-    delay(1000);
     // Say Start Game when preparing 
     AudioPlayStart();
   }
 
-  // Wait to start
-  if (state == 0) {
+  // Wait to start - & wait for audio "start game" to stop
+  if (state == 0 && !AudioRunning[1]) {
     // Check Serial
     char input[1];
     input[0] = 0;
@@ -571,6 +569,7 @@ void loop() {
     // Start a game - s or BopIt
     if (input[0] == 's' || (startswitch & 1)) {
       Serial.printf("Started\r\n");
+      // Call ensemble function to start
       ResetScoreTimerState(); // Start from state 3
 
       // Player has a minute to play repeatedly.
@@ -600,7 +599,7 @@ void loop() {
   }
 
   // Next sound/request cycle
-  // Either user was right or did not action
+  // Either 3=user was right or 2=did not action
   if (state == 3 || state == 2) {
     if (thismillis - cyclemillis > cycleinterval) {
       // If right get next random 0..4
@@ -646,11 +645,17 @@ void loop() {
           // Or ... Did not respond!
           state = 4;
           substate = 0;
-          Serial.printf("OUT OF TIME!\r\n");
+          Serial.printf("Out of time!\r\n");
         }
       }
     }
+    // still state 2 or 3, play beat
+    if ( thismillis > BeatTime ) {
+      AudioPlayBeat(1);
+      BeatTime = thismillis + cycleinterval; // Don't beat again
+    }
   }
+
   // If waiting for guard interval
   if (state == 1) {
     if (thismillis - cyclemillis > guardinterval) {
@@ -660,13 +665,15 @@ void loop() {
       setLED( -1);
       // record last switch state
       switchstate = switchbits();
+
+      // Check if game should be terminated - press TWIST && PULL
+      if ( (switchstate & 8) && (switchstate & 4 ) ) {
+        Serial.printf("Twist & Pull END GAME\n\r");
+        state = -1;
+      }
     }
   }
-  // play beat and stop
-  if ( (state == 3 || state == 2) && (thismillis > BeatTime) ) {
-    AudioPlayBeat(1);
-    BeatTime = thismillis + cycleinterval; // Don't beat again
-  }
+
   // Waiting for switches
   if (state == 2) {
     int codeinput = -1; // Nothing
@@ -787,12 +794,12 @@ void loop() {
         // If a whole minute is up, game ends outright
         if (timedgameends < thismillis) {
           Serial.printf("GAME OVER 1 MIN END\r\n");
-          //AudioStop(0); // Stop the beat
           AudioPlayGameOver();
           // state -1 Hangs about to say stuff before restarting
           state = -1;
         } else {
           Serial.printf("GAME CONTINUE\r\n");
+          // Call ensemble function to start active game
           ResetScoreTimerState(); // Carry on
         }
     }
@@ -868,7 +875,7 @@ void loop() {
   }
 
   // Play background
-  if ( !AudioPlay( 0) ) {
+  if (!AudioPlay( 0) ) {
     //if (state >= 1 && state <= 3) {
     //  AudioPlayBeat();
     //  // Loop beat
