@@ -11,7 +11,8 @@
 // PREFERENCES
 // ***********************************************************************************************************************
 #include "Preferences.h"
-#define EEPROMSET 100
+// 101 Adds Gain
+#define EEPROMSET 101
 // String length for some settings - 20 char and a 0 terminator
 #define SETTINGLENGTH 21
 Preferences prefs;
@@ -30,6 +31,8 @@ void setupSettings() {
   prefs.begin("ssid" );
   prefs.begin("password" );
   prefs.begin("bootcount" );
+  prefs.begin("gain0");
+  prefs.begin("gain1");
   Serial.printf("AppPrefs Created\n\r");
 }
 
@@ -41,6 +44,10 @@ void loadSettings() {
     prefs.getBytes("password", password, SETTINGLENGTH );
     bootcount = prefs.getUShort("bootcount", bootcount );
     Serial.printf("AppPrefs Loaded. Version %d. High Score %d\n\r", v, highscore);
+    if (v >= 101) {
+      gain[0] = prefs.getInt( "gain0", 2);
+      gain[1] = prefs.getInt( "gain1", 2);
+    }
   } else {
     Serial.printf("AppPrefs never saved\n\r");
   }
@@ -52,6 +59,8 @@ void saveSettings() {
   prefs.putBytes("ssid", ssid, SETTINGLENGTH );
   prefs.putBytes("password", password, SETTINGLENGTH );
   prefs.putUShort("bootcount", bootcount );
+  prefs.putInt("gain0", gain[0]);
+  prefs.putInt("gain1", gain[1]);
   Serial.printf("AppPrefs Saved\n\r");
 }
 
@@ -203,7 +212,7 @@ void AudioSetup( void) {
   afsource[0] = new AudioFileSourceSPIFFS( sfile[ 0] ); // Any file
   stub[0] = mixer->NewInput();
   gain[0] = 2;
-  stub[0]->SetGain(((float)(gain[0]))/10.0);
+  stub[0]->SetGain(((float)(gain[0]))/11.0);
   wav[0] = new AudioGeneratorMP3();
   AudioRunning[0] = false;
 
@@ -211,7 +220,7 @@ void AudioSetup( void) {
   afsource[1] = new AudioFileSourceSPIFFS( sfile[ 1] ); // Any file
   stub[1] = mixer->NewInput();
   gain[1] = 2;
-  stub[1]->SetGain(((float)(gain[1]))/10.0);
+  stub[1]->SetGain(((float)(gain[1]))/11.0);
   wav[1] = new AudioGeneratorMP3();
   AudioRunning[1] = false;
 }
@@ -225,7 +234,7 @@ void AudioStart( int chan, int selection) {
     }
     //select file and open file handle
     afsource[chan]->open( sfile[ selection ] );
-    stub[chan]->SetGain( ((float)(gain[chan]))/10.0);
+    //stub[chan]->SetGain( ((float)(gain[chan]))/10.0);
     wav[chan]->begin( afsource[ chan ], stub[chan]);
     AudioRunning[chan] = true;
     Serial.printf("Start Sound %d.\r\n", selection );
@@ -244,7 +253,7 @@ bool AudioPlay( int chan) {
         stub[chan]->stop();
         Serial.printf("stopped chan %d\r\n", chan);
         AudioRunning[chan] = false;
-        stub[chan]->SetGain( 0);
+        //stub[chan]->SetGain( 0);
 
         //If both chan stopped
         if (!AudioRunning[0] && !AudioRunning[1]) {
@@ -270,7 +279,7 @@ void AudioStop( int chan) {
   stub[chan]->stop();
   Serial.printf("Early stopped chan %d\r\n", chan);
   AudioRunning[chan] = false;
-  stub[chan]->SetGain( 0);
+  //stub[chan]->SetGain( 0);
 }
 
 // Start game - before 
@@ -586,11 +595,19 @@ void loop() {
     if (input[0] == 'v' || (startswitch & 16)) {
       Serial.printf("Vol change\r\n");
       state = -1; // Same state
-      // Gain 0.2, 0.4, 0.6, 0.8, 1.0
-      gain[ 0] += 2;
-      if (gain[0] > 10) gain[0] = 2;
-      gain[ 1] += 2;
-      if (gain[1] > 10) gain[1] = 2;
+      // Gain 2, 5, 8, 11 / 11
+      gain[ 0] += 3;
+      if (gain[0] > 11) gain[0] = 3;
+      gain[ 1] += 3;
+      if (gain[1] > 11) gain[1] = 3;
+
+      // Set gain for both channels  
+      stub[0]->SetGain(((float)(gain[0]))/11.0);
+      stub[1]->SetGain(((float)(gain[1]))/11.0);
+
+      // Save gain setting
+      saveSettings();
+
       // Say volume number
       AudioPlayNumber( gain[1] );
     }
