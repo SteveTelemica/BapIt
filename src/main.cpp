@@ -36,11 +36,11 @@ void setupSettings() {
 void loadSettings() {
   byte v = prefs.getChar("Ver", 0 );
   if (v >= 100) {
-  highscore = prefs.getInt("HighScore", 0 );
-  prefs.getBytes("ssid", ssid, SETTINGLENGTH );
-  prefs.getBytes("password", password, SETTINGLENGTH );
-  bootcount = prefs.getUShort("bootcount", bootcount );
-  Serial.printf("AppPrefs Loaded. Version %d. High Score %d\n\r", v, highscore);
+    highscore = prefs.getInt("HighScore", 0 );
+    prefs.getBytes("ssid", ssid, SETTINGLENGTH );
+    prefs.getBytes("password", password, SETTINGLENGTH );
+    bootcount = prefs.getUShort("bootcount", bootcount );
+    Serial.printf("AppPrefs Loaded. Version %d. High Score %d\n\r", v, highscore);
   } else {
     Serial.printf("AppPrefs never saved\n\r");
   }
@@ -190,7 +190,10 @@ void AudioSetup( void) {
     } else {
       fileexists[i] = false;
     }
+    // Swirl the LEDs
+    setLED(i % 5);
   }
+  setLED(-1);
 
   // Output
   out = new AudioOutputI2S();
@@ -406,8 +409,10 @@ void SetupSPIFFS() {
     printf("Error mounting SPIFFS\n\r");
     fsOK = false;
   } else {
-    printf( "SPIFFS Files:\n\r");
+    printf( "SPIFFS mounted\n\r");
     fsOK = true;
+#ifdef DEBUG
+    // List all files on drive
     File root = SPIFFS.open( "/", "r");
     File file = root.openNextFile();
     while ( file ) {
@@ -416,6 +421,7 @@ void SetupSPIFFS() {
         printf( "%s = %d\n\r", fileName.c_str(), fileSize );
         file = root.openNextFile();
     }
+#endif
   }
 }
 
@@ -451,18 +457,11 @@ void setup() {
   pinMode( 33, INPUT_PULLUP); //Twist
   pinMode( 19, INPUT_PULLUP); //Flick (was 25)
 
-  // Swirl the LEDs
-  for (int i = 0; i < 5; i++) {
-    setLED(i);
-    delay(200);
-  }
-  setLED(-1);
-
   // Reset of high score - switch on and hold Pull It down
   if ( switchbits() & 4) {
     highscore = 0;
     Serial.printf("High Score Reset\r\n");
-    // Flash LEDS a bit more
+    // Flash LEDS
     for (int i = 0; i < 5; i++) {
       setLED(i);
       delay(500);
