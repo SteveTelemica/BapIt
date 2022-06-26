@@ -8,6 +8,46 @@
 #include "SPIFFS.h"
 
 // ***********************************************************************************************************************
+// SWITCH & LED IO
+// ***********************************************************************************************************************
+int switchbits() {
+  // Set a bit for each input, active low
+  int x = ((digitalRead(34) == 0) ?  1 : 0 ) + // Bop
+          ((digitalRead(35) == 0) ?  2 : 0 ) + // Spin
+          ((digitalRead(32) == 0) ?  4 : 0 ) + // Pull
+          ((digitalRead(33) == 0) ?  8 : 0 ) + // Twist
+          ((digitalRead(19) == 0) ? 16 : 0 );  // Flick
+  return x;
+}
+
+void setLED( int action) {
+  digitalWrite(13, false);
+  digitalWrite(12, false);
+  digitalWrite(14, false);
+  digitalWrite(27, false);
+  digitalWrite(18, false);
+  switch( action) {
+    case 0:
+      digitalWrite(13, true);
+      break;
+    case 1:
+      digitalWrite(12, true);
+      break;
+    case 2:
+      digitalWrite(14, true);
+      break;
+    case 3:
+      digitalWrite(27, true);
+      break;
+    case 4:
+      digitalWrite(18, true); // was 26
+      break;
+  }
+}
+
+int switchstate = -1;
+
+// ***********************************************************************************************************************
 // PREFERENCES
 // ***********************************************************************************************************************
 #include "Preferences.h"
@@ -24,6 +64,7 @@ char password[SETTINGLENGTH] = STAPSK;
 
 byte bootcount = 0;
 int highscore = 0;
+int gain[2];
 
 void setupSettings() {
   prefs.begin("Ver" );
@@ -47,6 +88,9 @@ void loadSettings() {
     if (v >= 101) {
       gain[0] = prefs.getInt( "gain0", 2);
       gain[1] = prefs.getInt( "gain1", 2);
+    } else {
+      gain[0] = 2;
+      gain[1] = 2;
     }
   } else {
     Serial.printf("AppPrefs never saved\n\r");
@@ -184,8 +228,6 @@ AudioOutputI2S *out;
 AudioOutputMixer *mixer;
 AudioOutputMixerStub *stub[2];
 
-int gain[2];
-
 void AudioSetup( void) {
   // Allow logging of audio errors
   audioLogger = &Serial;
@@ -211,7 +253,6 @@ void AudioSetup( void) {
   // Rhythm channel
   afsource[0] = new AudioFileSourceSPIFFS( sfile[ 0] ); // Any file
   stub[0] = mixer->NewInput();
-  gain[0] = 2;
   stub[0]->SetGain(((float)(gain[0]))/11.0);
   wav[0] = new AudioGeneratorMP3();
   AudioRunning[0] = false;
@@ -219,7 +260,6 @@ void AudioSetup( void) {
   // Action channel
   afsource[1] = new AudioFileSourceSPIFFS( sfile[ 1] ); // Any file
   stub[1] = mixer->NewInput();
-  gain[1] = 2;
   stub[1]->SetGain(((float)(gain[1]))/11.0);
   wav[1] = new AudioGeneratorMP3();
   AudioRunning[1] = false;
@@ -369,45 +409,6 @@ void AudioPlayNumber(int n) {
 }
 
 
-// ***********************************************************************************************************************
-// SWITCH & LED IO
-// ***********************************************************************************************************************
-int switchbits() {
-  // Set a bit for each input, active low
-  int x = ((digitalRead(34) == 0) ?  1 : 0 ) + // Bop
-          ((digitalRead(35) == 0) ?  2 : 0 ) + // Spin
-          ((digitalRead(32) == 0) ?  4 : 0 ) + // Pull
-          ((digitalRead(33) == 0) ?  8 : 0 ) + // Twist
-          ((digitalRead(19) == 0) ? 16 : 0 );  // Flick
-  return x;
-}
-
-void setLED( int action) {
-  digitalWrite(13, false);
-  digitalWrite(12, false);
-  digitalWrite(14, false);
-  digitalWrite(27, false);
-  digitalWrite(18, false);
-  switch( action) {
-    case 0:
-      digitalWrite(13, true);
-      break;
-    case 1:
-      digitalWrite(12, true);
-      break;
-    case 2:
-      digitalWrite(14, true);
-      break;
-    case 3:
-      digitalWrite(27, true);
-      break;
-    case 4:
-      digitalWrite(18, true); // was 26
-      break;
-  }
-}
-
-int switchstate = -1;
 
 // ***********************************************************************************************************************
 // SPIFFS
@@ -524,17 +525,21 @@ int getcycleinterval( int score) {
     return 2200; //-300
   if (score <= 10)
     return 2000; //-200
-  if (score <= 15)
-    return 1850; //-150
   if (score <= 20)
-    return 1750; //-100
+    return 1800; //-200
   if (score <= 30)
-    return 1650; //-100
+    return 1650; //-150
   if (score <= 40)
-    return 1550; //-100
-  if (score <= 50)
-    return 1450; //-100
-    return 1350; //-100
+    return 1500; //-150
+  if (score <= 60)
+    return 1400; //-100
+  if (score <= 80)
+    return 1300; //-100
+  if (score <= 100)
+    return 1250; //-50
+  if (score <= 120)
+    return 1200; //-50
+    return 1150; //-50
 }
 
 void ResetScoreTimerState() {
@@ -597,9 +602,9 @@ void loop() {
       state = -1; // Same state
       // Gain 2, 5, 8, 11 / 11
       gain[ 0] += 3;
-      if (gain[0] > 11) gain[0] = 3;
+      if (gain[0] > 11) gain[0] = 2;
       gain[ 1] += 3;
-      if (gain[1] > 11) gain[1] = 3;
+      if (gain[1] > 11) gain[1] = 2;
 
       // Set gain for both channels  
       stub[0]->SetGain(((float)(gain[0]))/11.0);
